@@ -1,0 +1,128 @@
+# This class is in Layers.py
+class SelfAttentionCNN(tf.keras.Model):
+    def __init__(self, batch_size, height, width, input_channels, num_heads, **kwargs):
+        super(SelfAttentionCNN, self).__init__(**kwargs)
+        self.batch_size = batch_size
+        self.height = height
+        self.width = width
+        self.input_channels = input_channels
+        self.num_heads = num_heads
+
+        self.f = klayers.Conv2D(filters=self.num_heads, kernel_size=(1, 1), padding='valid', use_bias=False)
+        self.g = klayers.Conv2D(filters=self.num_heads, kernel_size=(1, 1), padding='valid', use_bias=False)
+        self.h = klayers.Conv2D(filters=self.num_heads, kernel_size=(1, 1), padding='valid', use_bias=False)
+
+        # Define Softmax and Multiply layers
+        self.softmax = klayers.Softmax(axis=-1)
+        self.multiply = klayers.Multiply()
+
+        # Define trainable weights Wv
+        self.Wv_layers = [self.add_weight(name=f'Wv_Z_{i}', shape=(1,), initializer='ones', trainable=True) for i in range(self.num_heads)]
+
+        # Define Gamma
+        self.Gamma = K.variable(1.0)
+
+    def call(self, x):
+        # Calculate F, G, H
+        F = self.f(x)
+        G = self.g(x)
+        H = self.h(x)
+
+        # Split from each filter
+        F = tf.split(F,num_or_size_splits=self.num_heads, axis=-1)
+        
+        G = tf.split(G,num_or_size_splits=self.num_heads, axis=-1)
+        # # print to see each element in G
+        # G_list = []
+        # for tensor in G:
+        #     G_list.append(tensor)
+        # print(np.array(G_list))
+         
+        H = tf.split(H,num_or_size_splits=self.num_heads, axis=-1)
+
+        # # Calculate S
+        S = []
+        for i in range(self.num_heads):
+            s = []
+            for j in range(self.num_heads):
+                product = tf.multiply(F[i], G[j]) # Perform element-wise multiplication
+                sum_product = tf.reduce_sum(product)  # Calculate the sum of each element in the feature map
+                s.append(sum_product)
+                del product
+                del sum_product
+            S.append(s)
+        
+
+        S = tf.transpose(S)
+        # del s
+        # Python flow version
+        # for each column apply the softmax function
+        # Beta = []
+        # for column in S:
+        #     column_softmax = self.softmax(column)
+        #     Beta.append(column_softmax)
+
+        # Pure Tensorflow flow version
+        Beta = tf.map_fn(self.process_column, S, dtype=tf.float32)
+        # print("Beta finished")
+
+        del S
+        # Beta = []
+        # for i in range(self.num_heads):
+        #     column = []
+        #     for j in range(self.num_heads):
+        #         sij = S[i][j]
+        #         column.append(sij)
+        #     column_softmax = self.softmax(column)
+        #     Beta.append(column_softmax)
+
+        # # Calculate Z
+        Z_i = []
+        for i in range(self.num_heads):
+            Z_temp = []
+            for j in range(self.num_heads):
+                temp = Beta[i][j]
+                H_mul_beta = tf.multiply(temp, H[j])  # Z_i = Beta[i][j] * H[j]
+                Z_temp.append(H_mul_beta)
+            Z_i.append(tf.add_n(Z_temp))
+        Z_i_array = np.array(Z_i)
+        # print(f"Z_i.shape = {Z_i_array.shape}")
+
+        del Beta
+
+        O = []
+        for _ in range(self.input_channels):
+            Wv_Z = []
+            for i in range(self.num_heads):
+                Wv_Zi = tf.multiply(self.Wv_layers[i],Z_i[i])  # Wv_ij * Z_i
+                Wv_Z.append(Wv_Zi)
+            O.append(tf.add_n(Wv_Z))    # O = sum(Wv_ij * Z_i)
+        O_array = np.array(O)
+        # print(f"O.shape = {O_array.shape}")
+        del Z_i
+
+        gamma_O = self.Gamma * O  
+
+        del O       
+        # print(f"gamma_O.shape = {gamma_O.shape}")
+        reshape_O = tf.reshape(gamma_O,(-1,self.height,self.width,self.input_channels))
+        Y = reshape_O + x     # Y = gamma * O + x
+        del reshape_O
+
+        return Y
+        # return x
+    # use tf.map_fn instead of recurrent 
+    def process_column(self, column):
+        column_softmax = self.softmax(column)
+        return column_softmax
+#     def calculate_FGH(self, x):
+#         F = self.f(x)
+#         G = self.g(x)
+#         H = self.h(x)
+
+#         # Split from each filter
+#         F = tf.split(F,num_or_size_splits=self.num_heads, axis=-1)
+#         G = tf.split(G,num_or_size_splits=self.num_heads, axis=-1)
+#         H = tf.split(H,num_or_size_splits=self.num_heads, axis=-1)
+
+#         return F, G, H
