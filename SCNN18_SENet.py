@@ -76,6 +76,7 @@ class SCNN18_SENet(Model):
         x = self.final_uscl_relu(x)
         x = self.final_uscl_bn(x)
         x = Squeeze_excitation_layer(x, 256, 32, 'seblock')
+        # remove maxpooling since SE Net hava already done it
         # x = self.final_pool(x)
         x = self.final_conv(x)
         x = self.final_relu(x)
