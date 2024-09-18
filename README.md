@@ -1,11 +1,17 @@
 ## DeepLearningAudioClassification
 
-- **環境需求（Environment Requirement）**
+- **Tensorflow環境需求（Environment Requirement）**
     - Tensorflow : `2.3.0`
     - Python : `3.6.9`
     - Librosa : `0.8.0`
     - Tensorflow-probability : `0.11.0`
     - CUDA : `10.1.243`
+- **Pytorch環境需求（Environment Requirement）**
+    - Pytorch : `2.2.1`
+    - Python : `3.9.18`
+    - Numpy : `1.24.1`
+    - h5py : `3.10.0`
+    - CUDA : `12.0`
 - **環境設置（Setup）**
     1. First, download the dataset from [Github](https://github.com/NTUT-LabASPL/FMA-C-DataSet-for-Vocal-Detection)  and place it in the `data` folder.
     2. Depending on your requirements, execute different files:
